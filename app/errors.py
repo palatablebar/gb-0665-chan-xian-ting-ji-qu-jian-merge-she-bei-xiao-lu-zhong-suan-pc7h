@@ -5,5 +5,8 @@ class DomainError(ValueError):
         super().__init__(detail)
 def reject(code,detail):
     raise DomainError(code,detail)
+def status_for(code):
+    # 版本状态类冲突返回409，内容/参数类问题返回422。
+    return 409 if code in {"STALE_VERSION","STATE","LOCKED","APPROVAL","COVERAGE"} else 422
 def http_error(exc):
-    return HTTPException(409 if exc.code=="STALE_VERSION" else 422,detail={"code":exc.code,"message":str(exc)})
+    return HTTPException(status_for(exc.code),detail={"code":exc.code,"message":str(exc)})

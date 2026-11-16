@@ -9,8 +9,8 @@ def validate(options):
     return options
 def csv_evidence(result):
     buffer=io.StringIO();writer=csv.writer(buffer)
-    writer.writerow(["运行号","类别","来源行","原因码","原值"])
-    rid=result["manifest"]["run_id"]
-    for row in result.get("quarantine",[]):writer.writerow([rid,"隔离",row.get("line"),row.get("code"),json.dumps(row.get("raw",{}),ensure_ascii=False)])
-    for row in result.get("results",[]):writer.writerow([rid,"结论",row.get("line",""),row.get("status",""),json.dumps(row,ensure_ascii=False)])
-    return "\ufeff"+buffer.getvalue()
+    writer.writerow(["运行号","版本状态","修订","来源行","类别","记录号","原因码","原值"])
+    rid=result["manifest"]["run_id"];state=result.get("state") or "";revision=result.get("revision") or ""
+    for row in result.get("quarantine",[]):writer.writerow([rid,state,revision,row.get("line"),"隔离",row.get("raw",{}).get("record_id",""),row.get("code"),json.dumps(row.get("raw",{}),ensure_ascii=False)])
+    for row in result.get("results",[]):writer.writerow([rid,state,revision,row.get("line",""),"结论",row.get("record_id",""),row.get("status",""),json.dumps(row,ensure_ascii=False)])
+    return "﻿"+buffer.getvalue()

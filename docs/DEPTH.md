@@ -13,7 +13,7 @@
 | M4 效率重算 | 复算三项效率及OEE | `GET /api/calculate` | `app/modules/m4_calculate/service.py` `app/modules/m4_calculate/rules.py` | `tests/test_calculate.py` |
 | M5 缺陷隔离 | 按原因筛查异常班报 | `GET /api/quarantine` | `app/modules/m5_quarantine/service.py` `app/modules/m5_quarantine/rules.py` | `tests/test_quarantine.py` |
 | M6 班次对账 | 核查时间与产量守恒 | `GET /api/reconcile` | `app/modules/m6_reconcile/service.py` `app/modules/m6_reconcile/rules.py` | `tests/test_reconcile.py` |
-| M7 运行复核 | 保存运行与版本复核 | `GET /api/batches` | `app/modules/m7_batches/service.py` `app/modules/m7_batches/rules.py` | `tests/test_batches.py` |
+| M7 运行复核 | 保存运行、版本复核与生效切换 | `GET /api/batches` `POST /api/runs/{run_id}/adopt` | `app/modules/m7_batches/service.py` `app/store.py` `app/versioning.py` | `tests/test_batches.py` |
 
 ## 陷阱登记
 
@@ -28,10 +28,14 @@
 | TRAP-14 | 重复班报异值 | 静默误算或覆盖证据 | 全部冲突隔离 | `app/modules/m2_contract/rules.py` | `tests/test_contract.py::test_conflict` |
 | TRAP-19 | 停机多因重叠 | 静默误算或覆盖证据 | 显式安全故障换型优先级 | `app/modules/m3_model/rules.py` | `tests/test_model.py::test_priority` |
 | TRAP-23 | 相邻区间边界 | 静默误算或覆盖证据 | 半开片段不重计 | `app/modules/m3_model/rules.py` | `tests/test_model.py::test_half_open` |
-| TRAP-26 | 旧版复核 | 静默误算或覆盖证据 | 修订号条件更新 | `app/modules/m7_batches/rules.py` | `tests/test_batches.py::test_stale` |
+| TRAP-26 | 旧版复核 | 静默误算或覆盖证据 | 修订号条件更新 | `app/store.py::review` | `tests/test_batches.py::test_stale` |
+| TRAP-27 | 午后补发修订值 | 直接覆盖现用结果，已复核页面的原始依据被改写 | 修订登记为待生效版本，显式原子切换；旧版本转已替换并只读 | `app/store.py` `app/versioning.py` | `tests/test_batches.py::test_revision_does_not_replace_active`、`test_original_evidence_immutable_after_adoption` |
+| TRAP-28 | 切换失败与重试 | 半途写入留下半新半旧结果，重试新增重复版本 | 单事务条件更新，失败回滚保留旧现用；同一目标重复提交幂等返回 | `app/store.py::adopt` | `tests/test_batches.py::test_failed_adoption_keeps_old_and_retry_is_idempotent` |
+| TRAP-29 | 修订缺班 | 切换后现用覆盖的班次凭空消失 | 班次覆盖校验，缺班返回 COVERAGE 并保留旧现用 | `app/store.py::adopt` | `tests/test_batches.py::test_adoption_rejects_missing_shifts` |
+| TRAP-30 | 浏览页面复活归档版本 | 打开工作台或重跑相同内容把已替换版本改回待生效 | 已登记版本按原状态返回，页面无 run_id 时定位当前采用版本 | `app/store.py::save` `app/web.py` | `tests/test_batches.py::test_rerun_same_content_does_not_revive_archived` |
 
 ## 对账规则
 计划分钟=运行分钟+有效停机分钟。班次总分钟=计划分钟+休息并集分钟。总产=良品+废品。起止时间使用含偏移的ISO格式，班次最长24小时。区间采用[start,end)，超出班次的停机裁剪，重叠休息只扣一次。total与good为整数件，ideal_seconds为每件理想秒数。零计划、零运行、零产量分别给出状态，不以任意分母补零。
 
 ## 已知不覆盖
-不推断缺失班报，不接入PLC。样例按班次隔离计算，不自动分割换产品后的节拍；混产品需分别生成班报。
+不推断缺失班报，不接入PLC。样例按班次隔离计算，不自动分割换产品后的节拍；混产品需分别生成班报。修订按班次组整批切换，不做逐条班次的部分生效；切换后未覆盖的旧记录仅保留在已替换版本中供追溯。

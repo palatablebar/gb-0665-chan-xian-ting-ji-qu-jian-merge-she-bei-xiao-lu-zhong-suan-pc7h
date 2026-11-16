@@ -16,6 +16,14 @@ def approve(run_id:str,options:dict):
     from app.store import review
     try:return review(run_id,options.get("revision"),options.get("decision"))
     except DomainError as exc:raise http_error(exc)
+@router.post("/api/runs/{run_id}/adopt")
+def adopt_run(run_id:str,options:dict):
+    from app.store import adopt,overview
+    try:
+        result=adopt(run_id,options.get("adopted_run_id"),options.get("revision"))
+        result["versions"]=overview(run_id)
+        return result
+    except DomainError as exc:raise http_error(exc)
 @router.get("/api/runs/{run_id}/evidence.csv")
 def evidence(run_id:str):
     from fastapi.responses import Response
